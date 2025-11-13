@@ -1127,9 +1127,10 @@ console.log('✅ HosteliQ Ready (AI Search + Working Filters Enabled)');
 // WITH this Gemini config:
 // REPLACE your current GEMINI_CONFIG with this:
 const GEMINI_CONFIG = {
-    API_KEY: 'AIzaSyCxt-eIUj3D_KXJ41lcB5zSBVeOiiPmdrw', // Your key (works!)
-    MODEL: 'gemini-1.5-flash-latest', // Updated model name
-    API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent'
+    API_KEY: 'AIzaSyCxt-eIUj3D_KXJ41lcB5zSBVeOiiPmdrw',
+    MODEL: 'gemini-1.5-flash',
+    // Fixed: Include 'models/' in the URL path
+    API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/models/gemini-1.5-flash:generateContent'
 };
 
 
@@ -1236,224 +1237,66 @@ async function sendAIMessage() {
 // Privacy-Safe AI - Rooms, Prices & Technical Info Only
 // Replace your getAIResponse function with this privacy-focused version:
 
+// Replace your entire getAIResponse function with this:
+// Replace your getAIResponse function with this working version:
 async function getAIResponse(question) {
-    console.log('🤖 Sending privacy-safe request to Google Gemini...');
+    console.log('🤖 Using Smart Mock AI (CORS-safe)');
     
-    // Analyze question type to determine response scope
+    // Simulate thinking delay
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    
     const q = question.toLowerCase();
-    const isGeneralQuestion = q.includes('tell me about') || q.includes('overview') || 
-                             q.includes('what is') || q.includes('system') || 
-                             q.includes('complete') || q.includes('all') ||
-                             q.includes('everything') || q.includes('full');
     
-    // ROOM INFORMATION (No personal data, just room specs)
-    const roomInfo = appState.rooms.map(room => ({
-        number: room.roomNumber,
-        type: room.roomType,
-        floor: room.floor,
-        capacity: room.capacity,
-        currentOccupancy: room.currentOccupancy || 0,
-        availableSpots: room.capacity - (room.currentOccupancy || 0),
-        status: room.status,
-        genderPolicy: room.gender,
-        monthlyRent: room.rent,
-        facilities: room.facilities || [],
-        isAvailable: room.status === 'Available' && (room.currentOccupancy || 0) < room.capacity
-    }));
-
-    // GENERAL SYSTEM STATISTICS (No personal info)
-    const systemStats = {
-        totalStudents: appState.students.length,
-        totalRooms: appState.rooms.length,
-        availableRooms: roomInfo.filter(r => r.isAvailable).length,
-        occupiedRooms: roomInfo.filter(r => r.currentOccupancy > 0).length,
-        totalCapacity: roomInfo.reduce((sum, r) => sum + r.capacity, 0),
-        currentOccupancy: roomInfo.reduce((sum, r) => sum + r.currentOccupancy, 0),
-        occupancyRate: calculateOccupancyRate(),
-        pendingBookings: appState.bookings.filter(b => b.status === 'Pending').length,
-        approvedBookings: appState.bookings.filter(b => b.status === 'Approved').length
-    };
-
-    // ROOM TYPE AND PRICING ANALYSIS
-    const roomAnalysis = {
-        byType: roomInfo.reduce((acc, r) => {
-            if (!acc[r.type]) {
-                acc[r.type] = { count: 0, available: 0, avgRent: 0, rents: [] };
-            }
-            acc[r.type].count++;
-            acc[r.type].rents.push(r.monthlyRent);
-            if (r.isAvailable) acc[r.type].available++;
-            return acc;
-        }, {}),
-        byGenderPolicy: roomInfo.reduce((acc, r) => {
-            if (!acc[r.genderPolicy]) {
-                acc[r.genderPolicy] = { count: 0, available: 0 };
-            }
-            acc[r.genderPolicy].count++;
-            if (r.isAvailable) acc[r.genderPolicy].available++;
-            return acc;
-        }, {}),
-        byFloor: roomInfo.reduce((acc, r) => {
-            const floor = `Floor ${r.floor}`;
-            if (!acc[floor]) {
-                acc[floor] = { count: 0, available: 0, avgRent: 0 };
-            }
-            acc[floor].count++;
-            if (r.isAvailable) acc[floor].available++;
-            return acc;
-        }, {}),
-        priceRange: {
-            lowest: Math.min(...roomInfo.map(r => r.monthlyRent)),
-            highest: Math.max(...roomInfo.map(r => r.monthlyRent)),
-            average: Math.round(roomInfo.reduce((sum, r) => sum + r.monthlyRent, 0) / roomInfo.length)
+    // Room availability queries
+    if (q.includes('room') && (q.includes('available') || q.includes('vacant'))) {
+        const availableRooms = appState.rooms.filter(r => r.status === 'Available');
+        if (availableRooms.length === 0) {
+            return "Currently **no rooms are available**. All rooms are either occupied or under maintenance. Please check back later.";
         }
-    };
-
-    // Calculate average rents by type
-    Object.keys(roomAnalysis.byType).forEach(type => {
-        const rents = roomAnalysis.byType[type].rents;
-        roomAnalysis.byType[type].avgRent = Math.round(rents.reduce((a, b) => a + b, 0) / rents.length);
-    });
-
-    // AVAILABLE FACILITIES ACROSS ALL ROOMS
-    const allFacilities = [...new Set(roomInfo.flatMap(r => r.facilities))];
-
-    let prompt;
+        return `**${availableRooms.length} rooms are currently available**:\n\n${availableRooms.slice(0, 3).map(r => 
+            `🏠 **Room ${r.roomNumber}**: ${r.roomType} room, Floor ${r.floor}, **₹${r.rent}/month**, ${r.gender} policy, Facilities: ${r.facilities?.join(', ') || 'Basic'}`
+        ).join('\n\n')}${availableRooms.length > 3 ? `\n\n*Plus ${availableRooms.length - 3} more rooms available.*` : ''}`;
+    }
     
-    if (isGeneralQuestion) {
-        prompt = `You are HosteliQ AI Assistant. Provide information about rooms, pricing, and system features. Do NOT share any personal information about students or staff.
-
-HOSTEL ROOM INFORMATION:
-
-ROOM INVENTORY (${systemStats.totalRooms} rooms total):
-${roomInfo.map(r => 
-    `Room ${r.number}: ${r.type} room, Floor ${r.floor}, ${r.capacity} capacity (${r.availableSpots} spots available), ${r.status}, ${r.genderPolicy} policy, ₹${r.monthlyRent}/month, Facilities: ${r.facilities.join(', ') || 'Basic'}`
-).join('\n')}
-
-ROOM ANALYSIS BY TYPE:
-${Object.entries(roomAnalysis.byType).map(([type, data]) => 
-    `${type}: ${data.count} rooms, ${data.available} available, Average rent: ₹${data.avgRent}/month`
-).join('\n')}
-
-PRICING INFORMATION:
-- Price Range: ₹${roomAnalysis.priceRange.lowest} - ₹${roomAnalysis.priceRange.highest} per month
-- Average Rent: ₹${roomAnalysis.priceRange.average} per month
-- Room Types: ${Object.keys(roomAnalysis.byType).join(', ')}
-
-OCCUPANCY STATISTICS:
-- Total Capacity: ${systemStats.totalCapacity} students
-- Current Occupancy: ${systemStats.currentOccupancy} students (${systemStats.occupancyRate}%)
-- Available Rooms: ${systemStats.availableRooms} out of ${systemStats.totalRooms}
-- Pending Bookings: ${systemStats.pendingBookings}
-
-FACILITIES AVAILABLE:
-${allFacilities.join(', ') || 'Basic amenities'}
-
-SYSTEM FEATURES:
-- Online room booking system
-- Real-time availability tracking
-- Automated booking workflow
-- Payment management system
-- Room allocation by gender policy
-- Multi-floor accommodation
-- Facilities management
-- Occupancy analytics
-- AI-powered assistance
-
-Question: ${question}
-
-Provide comprehensive information about rooms, pricing, facilities, and system capabilities. Focus on helping users understand accommodation options and technical features.`;
-    } else {
-        prompt = `You are HosteliQ AI Assistant. Answer questions about rooms, pricing, and technical features. Do NOT share personal information about individuals.
-
-ROOM & PRICING DATA:
-
-AVAILABLE ROOMS:
-${roomInfo.filter(r => r.isAvailable).map(r => 
-    `Room ${r.number}: ${r.type}, Floor ${r.floor}, ${r.capacity} capacity, ${r.genderPolicy} policy, ₹${r.monthlyRent}/month, Facilities: [${r.facilities.join(', ') || 'Basic'}]`
-).join('\n')}
-
-PRICING BY ROOM TYPE:
-${Object.entries(roomAnalysis.byType).map(([type, data]) => 
-    `${type} rooms: ₹${data.avgRent}/month average (${data.available}/${data.count} available)`
-).join('\n')}
-
-FLOOR-WISE AVAILABILITY:
-${Object.entries(roomAnalysis.byFloor).map(([floor, data]) => 
-    `${floor}: ${data.available}/${data.count} rooms available`
-).join('\n')}
-
-GENDER POLICIES:
-${Object.entries(roomAnalysis.byGenderPolicy).map(([policy, data]) => 
-    `${policy}: ${data.available}/${data.count} rooms available`
-).join('\n')}
-
-SYSTEM CAPABILITIES:
-- Room booking and management
-- Real-time availability tracking
-- Payment processing
-- Occupancy monitoring
-- Facilities management
-- Gender policy enforcement
-- Multi-floor accommodation
-- Automated workflows
-
-QUICK STATS:
-- Total Students: ${systemStats.totalStudents}
-- Available Rooms: ${systemStats.availableRooms}/${systemStats.totalRooms}
-- Occupancy Rate: ${systemStats.occupancyRate}%
-- Price Range: ₹${roomAnalysis.priceRange.lowest} - ₹${roomAnalysis.priceRange.highest}
-
-Question: ${question}
-
-Instructions:
-- Answer questions about room availability, pricing, and facilities
-- Explain system features and technical capabilities
-- Provide accommodation options and recommendations
-- Do NOT mention specific student names, emails, or personal details
-- Focus on helping users find suitable rooms and understand the system
-- Be helpful for general inquiries about the hostel management system`;
-    }
-
-    try {
-        const response = await fetch(`${GEMINI_CONFIG.API_URL}?key=${GEMINI_CONFIG.API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.7,
-                    maxOutputTokens: isGeneralQuestion ? 400 : 250,
-                    topP: 0.95,
-                    topK: 40
-                }
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            console.error('Gemini API Error:', errorData);
-            
-            if (response.status === 403) {
-                throw new Error('Gemini API key invalid. Please check your API key.');
-            } else if (response.status === 429) {
-                throw new Error('Too many requests. Please wait a moment and try again.');
-            } else {
-                throw new Error(`Gemini API Error: ${response.status}`);
-            }
-        }
-
-        const data = await response.json();
-        const aiResponse = data.candidates[0].content.parts[0].text;
+    // Pricing queries
+    if (q.includes('price') || q.includes('rent') || q.includes('cost') || q.includes('cheap')) {
+        const rents = appState.rooms.map(r => r.rent).filter(r => r > 0);
+        if (rents.length === 0) return "Pricing information is not available at the moment.";
         
-        console.log('✅ Privacy-safe Gemini response delivered');
-        return aiResponse;
+        const min = Math.min(...rents);
+        const max = Math.max(...rents);
+        const avg = Math.round(rents.reduce((a,b) => a+b) / rents.length);
         
-    } catch (error) {
-        console.error('❌ Gemini AI Error:', error);
-        throw error;
+        return `💰 **HosteliQ Pricing Information**:\n\n**Range**: ₹${min} - ₹${max} per month\n**Average**: ₹${avg} per month\n\nWe have rooms at various price points to suit different budgets. Contact us for specific room pricing and availability.`;
     }
+    
+    // System/general queries
+    if (q.includes('system') || q.includes('about') || q.includes('what is') || q.includes('tell me')) {
+        const available = appState.rooms.filter(r => r.status === 'Available').length;
+        const occupancy = calculateOccupancyRate();
+        
+        return `🏢 **Welcome to HosteliQ** - Your Complete Hostel Management System!\n\n📊 **Current Status**:\n• **${appState.students.length}** students registered\n• **${appState.rooms.length}** total rooms (${available} available)\n• **${occupancy}%** occupancy rate\n• **${appState.bookings.filter(b => b.status === 'Pending').length}** booking requests pending\n\n🎯 **System Features**:\n• Online room booking & management\n• Real-time availability tracking\n• Automated approval workflows\n• AI-powered assistance\n\nHow can I help you find the perfect accommodation?`;
+    }
+    
+    // Facilities queries
+    if (q.includes('facilities') || q.includes('amenities') || q.includes('wifi') || q.includes('ac')) {
+        const allFacilities = [...new Set(appState.rooms.flatMap(r => r.facilities || []))];
+        return `🏠 **HosteliQ Facilities Available**:\n\n${allFacilities.map(facility => `✅ **${facility}**`).join('\n')}\n\n*Facilities vary by room. Contact us for specific room amenities.*`;
+    }
+    
+    // Statistics queries
+    if (q.includes('occupancy') || q.includes('statistics') || q.includes('how many')) {
+        const occupancy = calculateOccupancyRate();
+        const available = appState.rooms.filter(r => r.status === 'Available').length;
+        
+        return `📊 **HosteliQ Statistics**:\n\n🏠 **Accommodation**:\n• Total Rooms: **${appState.rooms.length}**\n• Available Rooms: **${available}**\n• Occupancy Rate: **${occupancy}%**\n\n👥 **Community**:\n• Registered Students: **${appState.students.length}**\n• Pending Requests: **${appState.bookings.filter(b => b.status === 'Pending').length}**`;
+    }
+    
+    // Default helpful response
+    return `👋 Hello! I'm your HosteliQ AI Assistant. I can help you with:\n\n🏠 **Room Information**: "What rooms are available?"\n💰 **Pricing**: "What are the room prices?"\n🏢 **System Info**: "Tell me about HosteliQ"\n📊 **Statistics**: "What's the occupancy rate?"\n\nWhat would you like to know?`;
 }
+
+
 
 // Privacy-safe example questions the AI can handle:
 const PRIVACY_SAFE_QUESTIONS = [

@@ -26,3 +26,13 @@ const server = app.listen(PORT, () => {
   console.log(`🔗 Frontend: Served from /frontend`);
   console.log(`📱 API Base URL: http://localhost:${PORT}/api`);
 });
+
+// At the top with other routes
+const aiRoutes = require('./routes/ai');
+
+// In the middleware section
+app.use('/api/ai', aiRoutes);
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+});
